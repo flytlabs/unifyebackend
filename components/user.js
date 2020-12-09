@@ -58,7 +58,7 @@ const loginUser = async (req, res) => {
                             email: result.rows[0].email,
                         }
                         const token = generateAuthToken(user);
-                        await pool.query('UPDATE users SET tokens[1] = $1 WHERE email = $2', [token, email], (error, results) => {
+                        await pool.query('UPDATE users SET tokens = array_append(tokens, $1) WHERE email = $2', [token, email], (error, results) => {
                             if (error) {
                                 res.status(500).json({ message: 'Internal error', error: error });
                                 console.log(error);
@@ -79,7 +79,30 @@ const loginUser = async (req, res) => {
     }
 }
 
+const logoutUser = async (req, res) => {
+    try {
+        const { email } = req.user;
+        const token = req.cookies.authcookie;
+
+        await pool.query('UPDATE users SET tokens = array_remove(tokens, $1) WHERE email = $2', [token, email], (error, result) => {
+            if (error) {
+                res.status(500).json({ message: 'Internal error', error: error});
+                console.log(error);
+            } else if (result.rowCount > 0) {
+                res.clearCookie('authcookie', { httpOnly: true, secure: true, sameSite: 'none' });
+                res.status(200).json({ message: 'Logged out succesfully' });
+            } else {
+                res.status(400).json({ message: 'Something went wrong' });
+            }
+        })
+    }
+    catch (error) {
+        res.status(500).json({ message: 'Internal error', error: error });
+    }
+}
+
 module.exports = {
     registerUser,
     loginUser,
+    logoutUser
 }
